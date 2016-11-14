@@ -22,7 +22,7 @@ from __future__ import absolute_import
 from __future__ import division
 # from __future__ import print_function
 
-
+import os
 import argparse
 import cv2
 import numpy as np
@@ -33,6 +33,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 
 FLAGS = None
+ 
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -50,6 +51,7 @@ def max_pool_2x2(x):
                         strides=[1, 2, 2, 1], padding='SAME')
 
 def main(_):
+  
   mnist = input_data.read_data_sets(FLAGS.data_dir, one_hot=True)
   sess = tf.InteractiveSession()
 
@@ -92,21 +94,37 @@ def main(_):
   train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
   correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
   accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-  sess.run(tf.initialize_all_variables())
 
-  for i in range(20000):
-    batch = mnist.train.next_batch(50)
-    if i%100 == 0:
-      train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
-      print("step %d, training accuracy %g"%(i, train_accuracy))
-    train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
-  print("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+  # Try to restore from a checkpoint
+  saver = tf.train.Saver()
+  if os.path.isfile(FLAGS.checkpoint):
+    saver.restore(sess, FLAGS.checkpoint)
+    print("Restored model with accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+  else:
+    sess.run(tf.initialize_all_variables())
 
-  y_conv=tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
+  # for i in range(20000):
+  # for i in range(300):
+  #   batch = mnist.train.next_batch(50)
+  #   if i%100 == 0:
+  #     train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
+  #     print("step %d, training accuracy %g"%(i, train_accuracy))
+  #     saver.save(sess, FLAGS.checkpoint)
+  #   train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
+  # print("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+
+  if FLAGS.img:
+    img = np.ones((28, 28)) - (cv2.imread(FLAGS.img, cv2.CV_LOAD_IMAGE_GRAYSCALE) / 256.)
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+    img_vector = np.reshape(img, np.shape(mnist.test.images[0]))
+    print sess.run(y_, feed_dict={x: [img_vector]})
+    # print sess.run(tf.argmax(y_conv, 1), feed_dict={x: [img_vector]})
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--data_dir', type=str, default='/tmp/data',help='Directory for storing data')
+  parser.add_argument('--checkpoint', type=str, help='Model checkpoint', default="./." + __file__ + ".ckpt")
   parser.add_argument('--img', type=str, help='Image to test against')
   FLAGS = parser.parse_args()
   tf.app.run()
